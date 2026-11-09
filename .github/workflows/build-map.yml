@@ -1,0 +1,62 @@
+name: Update the map
+
+# Runs whenever the spreadsheet (or the map design) changes on main, or when started by hand
+# from the Actions tab ("Run workflow").
+on:
+  push:
+    branches: [main]
+    paths: ["data/**", "build/**", ".github/workflows/build-map.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # save the offline copy (index.html) back to the repository
+  pages: write      # publish to GitHub Pages
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install spreadsheet reader
+        run: pip install openpyxl==3.1.5
+
+      - name: Check the spreadsheet and build the map
+        run: python build/build.py data site
+
+      - name: Save the offline copy to the repository
+        run: |
+          cp site/index.html index.html
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Update map from spreadsheet [skip ci]"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

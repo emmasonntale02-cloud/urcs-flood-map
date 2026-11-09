@@ -1,0 +1,357 @@
+<title>URCS Flood Early Warning Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/*__LEAFLET_CSS__*/
+</style>
+<style>
+/* Layout: app shell; red-ruled header, sidebar of layers/areas/sites on the left, map filling the rest, site card floating on the map.
+   Single light theme on purpose: it matches the printed atlas sheet and the URCS brand. */
+:root{
+  color-scheme:light;
+  --brand:#ee2d21; --brand-dark:#a3111d; --brand-tint:#fbe3e3;
+  --ink:#1b2328; --muted:#56646a; --line:#d9dfdc; --paper:#ffffff; --panel:#f6f7f5;
+  --outside:#dfe8ee; --nbr:#ecede8; --land:#ffffff; --water:#b3d3ea; --water-line:#6fa6d0; --dline:#c4cdc8;
+  --gauge:#1f6fb2; --station:#e58a00; --radio:#2e8a4e;
+  --display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+html,body{height:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.4}
+.app{height:100%;display:grid;grid-template-rows:auto 1fr;}
+header.top{display:flex;align-items:center;gap:14px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));border-bottom:3px solid var(--brand);background:var(--paper);min-width:0}
+header.top .logo{flex:none;width:58px;height:58px}
+.ttl{min-width:0;flex:1}
+.ttl .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand-dark)}
+.ttl h1{font-family:var(--display);font-weight:700;font-size:clamp(20px,2.4vw,30px);line-height:1.05;margin:2px 0 0;text-wrap:balance}
+.total{display:flex;align-items:center;gap:10px;flex:none}
+.total b{font-family:var(--display);font-size:52px;line-height:.9;color:var(--brand);font-variant-numeric:tabular-nums}
+.total span{font-size:14px;color:var(--muted);line-height:1.2}
+.total strong{color:var(--ink)}
+.btn{font:600 14px var(--body);border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);padding:8px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn:hover{filter:brightness(.95)}
+.btn:focus-visible,.chip:focus-visible,.layer:focus-visible,.site:focus-visible,.icon-btn:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+
+.main{display:grid;grid-template-columns:340px 1fr;min-height:0}
+aside.side{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:14px 16px 24px;display:flex;flex-direction:column;gap:18px;min-width:0}
+h2{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--brand-dark);margin:0 0 8px;font-weight:500}
+.layers{display:grid;gap:6px}
+.layer{display:grid;grid-template-columns:34px 1fr auto 20px;align-items:center;gap:10px;background:var(--paper);border:1.5px solid var(--line);padding:6px 10px;cursor:pointer;text-align:left;font:600 14.5px var(--body);color:var(--ink)}
+.layer .n{font-family:var(--display);font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.layer .chk{width:18px;height:18px;border:2px solid var(--ink);display:grid;place-items:center}
+.layer[aria-pressed="true"] .chk{background:var(--ink)}
+.layer[aria-pressed="true"] .chk::after{content:"";width:8px;height:4px;border:2px solid #fff;border-top:0;border-right:0;transform:rotate(-45deg) translate(1px,-1px)}
+.layer[aria-pressed="false"]{opacity:.5}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:600 13.5px var(--body);border:1.5px solid var(--line);background:var(--paper);color:var(--ink);padding:6px 10px;cursor:pointer}
+.chip small{color:var(--muted);font-weight:400;margin-left:4px}
+.chip.on{border-color:var(--brand);background:var(--brand-tint)}
+.search{width:100%;box-sizing:border-box;font:15px var(--body);padding:8px 10px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink)}
+.search:focus{outline:2px solid var(--ink);outline-offset:0}
+.group{margin-top:10px}
+.group h3{display:flex;justify-content:space-between;font-family:var(--display);font-size:17px;font-weight:700;margin:0 0 4px;padding-bottom:3px;border-bottom:1.5px solid var(--ink)}
+.group h3 span{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--muted)}
+.site{display:grid;grid-template-columns:22px 1fr;gap:8px;align-items:center;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:6px 2px;cursor:pointer;font:14px var(--body);color:var(--ink)}
+.site:hover,.site.sel{background:var(--brand-tint)}
+.site b{font-weight:600;display:block}
+.site em{font-style:normal;color:var(--muted);font-size:12.5px}
+.empty{color:var(--muted);font-size:14px;padding:8px 0}
+.note{font-size:12.5px;color:var(--muted);line-height:1.45}
+
+.mapwrap{position:relative;min-height:0;min-width:0}
+#map{position:absolute;inset:0;background:var(--outside);font-family:var(--body)}
+.leaflet-container{background:var(--outside)}
+.pinicon{background:none;border:0}
+.pinicon svg{display:block;filter:drop-shadow(0 1px 1px rgb(0 0 0 / .18));transition:transform .15s;transform-origin:50% 100%}
+.pinicon.sel svg{transform:scale(1.35)}
+.site-label{background:rgb(255 255 255 / .92);border:0;box-shadow:none;font:600 12.5px var(--body);color:var(--ink);padding:1px 5px}
+.site-label::before{display:none}
+.labels-off .site-label{display:none}
+.dlabel{background:none;border:0;font-family:var(--display);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--brand-dark);font-size:14px;white-space:nowrap;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff}
+.dlabel.minor{font-family:var(--body);font-weight:600;font-size:11px;color:#7f8c90;letter-spacing:.06em}
+.minor-off .dlabel.minor,.minor-off .dlabel.elgon{display:none}
+.dlabel.elgon-group{display:none}
+.minor-off .dlabel.elgon-group{display:block}
+.nlabel{background:none;border:0;font-family:var(--display);font-weight:600;letter-spacing:.22em;color:#848d86;font-size:14px;white-space:nowrap}
+.llabel{background:none;border:0;font-style:italic;color:#2f6f9f;font-size:13px;white-space:nowrap}
+.leaflet-control-scale-line{border-color:var(--ink);font-family:var(--mono);font-size:11px;background:rgb(255 255 255 / .85)}
+.leaflet-control-zoom a{color:var(--ink)}
+
+.card{position:absolute;z-index:500;left:12px;bottom:12px;width:min(360px,calc(100% - 24px));background:var(--paper);border:1.5px solid var(--ink);box-shadow:0 10px 30px rgb(0 0 0 / .2)}
+.card .hd{display:flex;gap:10px;align-items:center;padding:10px 12px;color:#fff}
+.card .hd svg{flex:none}
+.card .hd .k{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.9}
+.card .hd h3{font-family:var(--display);font-size:21px;font-weight:700;margin:0;line-height:1.1}
+.card .icon-btn{margin-left:auto;align-self:flex-start;background:none;border:0;color:#fff;font-size:22px;line-height:1;cursor:pointer;padding:2px 4px}
+.card dl{display:grid;grid-template-columns:110px 1fr;gap:6px 10px;margin:0;padding:12px}
+.card dt{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-top:2px}
+.card dd{margin:0;font-size:14.5px;min-width:0}
+.card .coords{font-family:var(--mono);font-size:13px;user-select:all}
+.card .row{display:flex;gap:8px;padding:0 12px 12px}
+.card .row .btn{padding:6px 10px;font-size:13px}
+
+.tour{position:absolute;z-index:600;left:50%;transform:translateX(-50%);bottom:14px;width:min(640px,calc(100% - 24px));background:var(--ink);color:#fff;display:grid;grid-template-columns:1fr auto;gap:6px 14px;padding:14px 16px;box-shadow:0 10px 30px rgb(0 0 0 / .3)}
+.tour .step{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#ff8f87}
+.tour h3{font-family:var(--display);font-size:26px;font-weight:700;margin:2px 0 4px;line-height:1.05}
+.tour p{margin:0;font-size:15px;color:#d8dee0;max-width:60ch}
+.tour .ctrls{display:flex;gap:6px;align-items:flex-start}
+.tour .btn{background:transparent;color:#fff;border-color:#fff}
+.tour .btn.primary{background:var(--brand);border-color:var(--brand)}
+.tour .stats{grid-column:1/-1;display:flex;gap:16px;flex-wrap:wrap}
+.tour .stats span{display:inline-flex;align-items:center;gap:6px;font-family:var(--display);font-size:22px;font-weight:700}
+
+@media (max-width:820px){
+  .app{height:auto;min-height:100%}
+  .main{grid-template-columns:1fr;grid-template-rows:62vh auto}
+  .mapwrap{order:1;height:62vh}
+  aside.side{order:2;border-right:0;border-top:1px solid var(--line);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  header.top{flex-wrap:wrap;row-gap:8px}
+  .ttl{flex:1 1 calc(100% - 70px)}
+  .ttl .eyebrow{font-size:10px}
+  .total{margin-left:auto}
+  .total b{font-size:38px}
+  header.top .logo{width:44px;height:44px}
+  .tour{grid-template-columns:1fr}
+  .tour h3{font-size:21px}
+}
+@media (prefers-reduced-motion:reduce){.pinicon svg{transition:none}}
+</style>
+
+<!--__ICONS__-->
+
+<div class="app">
+  <header class="top">
+    <!--__LOGO__-->
+    <div class="ttl"><div class="eyebrow">Uganda Red Cross Society · Interactive atlas</div>
+      <h1>Community Flood Early Warning Network, Uganda</h1></div>
+    <div class="total"><b id="tot">27</b><span>installations<br>in <strong id="ndist">7 districts</strong></span></div>
+    <button class="btn primary" id="presentBtn" type="button">▶ Present</button>
+  </header>
+  <div class="main">
+    <aside class="side" aria-label="Map controls and site list">
+      <section><h2>Show on map</h2><div class="layers" id="layers"></div></section>
+      <section><h2>Go to area</h2><div class="chips" id="areas"></div></section>
+      <section><h2>Sites</h2>
+        <input class="search" id="q" type="search" placeholder="Search by river, place or district" aria-label="Search sites">
+        <div id="list"></div></section>
+      <p class="note">Coordinates: WGS 84. Base map: Natural Earth; district boundaries are indicative and predate Obongi District. Site data: project GPS survey (GPS_DATA_COORDINATES).</p>
+    </aside>
+    <div class="mapwrap">
+      <div id="map" role="application" aria-label="Map of flood early warning installations in Uganda"></div>
+      <div class="card" id="card" hidden></div>
+      <div class="tour" id="tour" hidden></div>
+    </div>
+  </div>
+</div>
+
+<script id="atlas-data" type="application/json">/*__DATA__*/</script>
+<!--__LEAFLET_JS__-->
+<script>
+(function(){
+const D = JSON.parse(document.getElementById('atlas-data').textContent);
+// Districts grouped as one "Mt Elgon" area; regional names shown for other districts.
+const ELGON = ['Butaleja','Mbale','Sironko','Bududa','Bulambuli','Manafwa','Namisindwa','Kapchorwa','Kween','Bukwa','Tororo','Namutumba','Budaka','Pallisa','Kibuku'];
+const REGION = {Kasese:'Rwenzori foothills',Bundibugyo:'Rwenzori foothills',Ntoroko:'Semliki',Obongi:'West Nile',Moyo:'West Nile',Adjumani:'West Nile',Yumbe:'West Nile',Arua:'West Nile',Moroto:'Karamoja',Napak:'Karamoja',Kotido:'Karamoja',Kaabong:'Karamoja',Nakapiripirit:'Karamoja',Amudat:'Karamoja'};
+const SITES = D.sites;
+const T = {
+  gauge:{name:'Community river gauge', plural:'Community river gauges', color:'#1f6fb2'},
+  station:{name:'Automatic flood monitoring station', plural:'Automatic flood monitoring stations', color:'#e58a00'},
+  radio:{name:'Community radio', plural:'Community radios', color:'#2e8a4e'}
+};
+const ORDER = ['gauge','station','radio'];
+const DISTRICTS = [...new Set(SITES.map(s=>s.district))].sort();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const count = (arr,t) => arr.filter(s=>s.type===t).length;
+
+function pinSVG(t,h){
+  return `<svg width="${(h*0.8).toFixed(0)}" height="${h}" viewBox="-2 -2 44 56" aria-hidden="true"><use href="#pinShape" fill="${T[t].color}"/><circle cx="20" cy="19.8" r="13.5" fill="#000" fill-opacity=".12"/><use href="#i-${t}" x="8" y="7.8" width="24" height="24" color="#fff"/></svg>`;
+}
+function roundSVG(t,s){
+  return `<svg width="${s}" height="${s}" viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="21" fill="${T[t].color}"/><use href="#i-${t}" x="10" y="10" width="24" height="24" color="#fff"/></svg>`;
+}
+
+document.getElementById('tot').textContent = SITES.length;
+document.getElementById('ndist').textContent = DISTRICTS.length + ' districts';
+
+// ---------- map ----------
+const map = L.map('map',{zoomSnap:.25, zoomDelta:.5, minZoom:5.5, maxZoom:16, attributionControl:false, preferCanvas:false});
+L.control.scale({imperial:false, position:'bottomright'}).addTo(map);
+map.createPane('base'); map.getPane('base').style.zIndex = 200;
+map.createPane('labels'); map.getPane('labels').style.zIndex = 450; map.getPane('labels').style.pointerEvents='none';
+L.geoJSON(D.neighbours,{pane:'base',style:{color:'#bfc6bf',weight:1,fillColor:'#ecede8',fillOpacity:1}}).addTo(map);
+const ugaLayer = L.geoJSON(D.uganda,{pane:'base',style:{stroke:false,fillColor:'#ffffff',fillOpacity:1}}).addTo(map);
+L.geoJSON(D.districts,{pane:'base',style:f=>f.properties.focus
+  ? {color:'#ee2d21',weight:1.6,fillColor:'#fbe3e3',fillOpacity:1}
+  : {color:'#c4cdc8',weight:.8,fill:false}}).addTo(map);
+L.geoJSON(D.lakes,{pane:'base',style:{color:'#6fa6d0',weight:.6,fillColor:'#b3d3ea',fillOpacity:1}}).addTo(map);
+L.geoJSON(D.rivers,{pane:'base',style:f=>({color:'#6fa6d0',weight:f.properties.rank<6?2.2:1.3})}).addTo(map);
+L.geoJSON(D.uganda,{pane:'base',style:{color:'#3d4a50',weight:2.4,fill:false}}).addTo(map);
+const lbl = (ll,html,cls)=>L.marker(ll,{pane:'labels',interactive:false,icon:L.divIcon({className:cls,html,iconSize:null})}).addTo(map);
+D.districts.features.forEach(f=>{
+  const p=f.properties;
+  lbl(p.lp, `<span style="position:relative;left:-50%">${esc(p.name)}</span>`, 'dlabel'+(p.focus?'':' minor')+(ELGON.includes(p.name)&&p.focus?' elgon':''));
+});
+// districts newer than the boundary data (e.g. Obongi): label just below their sites
+(D.extraLabels||[]).forEach(([n,a,b])=>lbl([a,b],`<span style="position:relative;left:-50%">${esc(n)}</span>`,'dlabel'));
+if(SITES.some(s=>ELGON.includes(s.district))) lbl([0.62,33.98],'<span style="position:relative;left:-50%">Mt Elgon</span>','dlabel elgon-group');
+[['SOUTH SUDAN',4.35,31.3],['KENYA',1.6,35.1],['DR CONGO',2.3,29.75],['TANZANIA',-1.35,31.4],['RWANDA',-1.45,29.95]]
+  .forEach(([t,a,b])=>lbl([a,b],`<span style="position:relative;left:-50%">${t}</span>`,'nlabel'));
+[['Lake Victoria',-0.75,33.0],['Lake Kyoga',1.55,33.0],['Lake Albert',1.75,30.75],['Lake Edward',-0.35,29.65]]
+  .forEach(([t,a,b])=>lbl([a,b],`<span style="position:relative;left:-50%">${t}</span>`,'llabel'));
+
+// co-located sites sit side by side
+const offset = {};
+SITES.forEach((s,i)=>SITES.forEach((o,j)=>{ if(j>i && Math.abs(s.lat-o.lat)<5e-4 && Math.abs(s.lon-o.lon)<5e-4){ offset[s.id]=-13; offset[o.id]=13; } }));
+
+const visible = {gauge:true,station:true,radio:true};
+const markers = {};
+let selected = null;
+function makeIcon(s, sel){
+  const h = 38, w = h*0.8, dx = offset[s.id]||0;
+  return L.divIcon({className:'pinicon'+(sel?' sel':''), html:pinSVG(s.type,h), iconSize:[w,h], iconAnchor:[w/2 - dx, h-2], tooltipAnchor:[w/2 - 2, -h/2]});
+}
+SITES.forEach(s=>{
+  const m = L.marker([s.lat,s.lon],{icon:makeIcon(s,false), title:`${T[s.type].name}: ${s.place}`, keyboard:true, riseOnHover:true});
+  m.bindTooltip(esc(s.short),{permanent:true,direction:'right',className:'site-label',offset:[-8,0]});
+  m.on('click',()=>select(s.id,false));
+  markers[s.id]=m; m.addTo(map);
+});
+function updateZoomClasses(){
+  const z = map.getZoom(), el = map.getContainer();
+  el.classList.toggle('labels-off', z < 9.5);
+  el.classList.toggle('minor-off', z < 8.5);
+}
+map.on('zoomend', updateZoomClasses);
+
+// ---------- areas ----------
+const bySel = f => SITES.filter(f);
+const slug = t => t.toLowerCase().replace(/[^a-z0-9]+/g,'-');
+const elgonSites = bySel(s=>ELGON.includes(s.district));
+const AREAS = [
+  {id:'uganda', name:'All of Uganda', sites:SITES, bounds:()=>ugaLayer.getBounds()},
+  ...(elgonSites.length ? [{id:'elgon', name:'Mt Elgon', sub:[...new Set(elgonSites.map(s=>s.district))].sort().join(' · '), sites:elgonSites}] : []),
+  ...DISTRICTS.filter(d=>!ELGON.includes(d)).sort((a,b)=>bySel(s=>s.district===b).length - bySel(s=>s.district===a).length || a.localeCompare(b))
+    .map(d=>({id:'d-'+slug(d), name:d, sub:REGION[d]||'', sites:bySel(s=>s.district===d)}))
+];
+function areaBounds(a){ return a.bounds ? a.bounds() : L.latLngBounds(a.sites.map(s=>[s.lat,s.lon])).pad(a.sites.length>4?.12:.6); }
+function goArea(id, opts={}){
+  const a = AREAS.find(x=>x.id===id);
+  document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on', c.dataset.id===id));
+  const b = areaBounds(a);
+  const pad = document.getElementById('tour').hidden ? [30,30] : [30,30];
+  const padBottom = document.getElementById('tour').hidden ? 30 : 190;
+  map.flyToBounds(b,{paddingTopLeft:[30,30],paddingBottomRight:[30,padBottom],maxZoom: a.id==='uganda'?7:12.5, duration: opts.instant?0:1.1});
+}
+document.getElementById('areas').innerHTML = AREAS.map(a=>`<button class="chip" type="button" data-id="${a.id}">${esc(a.name)}<small>${a.sites.length}</small></button>`).join('');
+document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>goArea(c.dataset.id));
+
+// ---------- layers ----------
+const layersEl = document.getElementById('layers');
+layersEl.innerHTML = ORDER.map(t=>`<button class="layer" type="button" data-t="${t}" aria-pressed="true">${pinSVG(t,34)}<span>${T[t].plural}</span><span class="n" style="color:${T[t].color}">${count(SITES,t)}</span><span class="chk" aria-hidden="true"></span></button>`).join('');
+function setVisible(t,on){
+  visible[t]=on;
+  layersEl.querySelector(`[data-t="${t}"]`).setAttribute('aria-pressed', on);
+  SITES.filter(s=>s.type===t).forEach(s=>{ on ? markers[s.id].addTo(map) : markers[s.id].remove(); });
+  if(!on && selected && SITES.find(s=>s.id===selected).type===t) closeCard();
+  renderList();
+}
+layersEl.querySelectorAll('.layer').forEach(b=>b.onclick=()=>setVisible(b.dataset.t, !visible[b.dataset.t]));
+
+// ---------- list ----------
+const q = document.getElementById('q');
+function renderList(){
+  const term = q.value.trim().toLowerCase();
+  const rows = SITES.filter(s=>visible[s.type] && (!term || [s.place,s.short,s.district,T[s.type].name].join(' ').toLowerCase().includes(term)));
+  const el = document.getElementById('list');
+  if(!rows.length){ el.innerHTML = `<p class="empty">No sites match. Try a river name such as “Manafwa”, or turn layers back on.</p>`; return; }
+  el.innerHTML = DISTRICTS.map(d=>{
+    const g = rows.filter(s=>s.district===d); if(!g.length) return '';
+    return `<div class="group"><h3>${esc(d)}<span>${g.length}</span></h3>` + g.map(s=>
+      `<button class="site${s.id===selected?' sel':''}" type="button" data-id="${s.id}">${roundSVG(s.type,22)}<span><b>${esc(s.place)}</b><em>${esc(T[s.type].name)}</em></span></button>`).join('') + '</div>';
+  }).join('');
+  el.querySelectorAll('.site').forEach(b=>b.onclick=()=>select(+b.dataset.id,true));
+}
+q.addEventListener('input', renderList);
+
+// ---------- card ----------
+const card = document.getElementById('card');
+function select(id, fly){
+  if(selected && markers[selected]) markers[selected].setIcon(makeIcon(SITES.find(s=>s.id===selected),false));
+  selected = id;
+  const s = SITES.find(x=>x.id===id);
+  markers[id].setIcon(makeIcon(s,true));
+  const dec = `${s.lat.toFixed(5)}, ${s.lon.toFixed(5)}`;
+  card.innerHTML = `<div class="hd" style="background:${T[s.type].color}">${roundSVG(s.type,40)}<div><div class="k">${esc(T[s.type].name)}</div><h3>${esc(s.place)}</h3></div><button class="icon-btn" type="button" id="cardClose" aria-label="Close site details">×</button></div>
+  <dl><dt>District</dt><dd>${esc(s.district)}</dd>
+  <dt>Equipment</dt><dd>${esc(s.tech)}</dd>
+  <dt>Coordinates</dt><dd><div class="coords">${esc(s.dms)}</div><div class="coords" id="dec">${dec}</div></dd>
+  <dt>Site ID</dt><dd>${s.id}</dd></dl>
+  <div class="row"><button class="btn" type="button" id="zoomTo">Zoom to site</button><button class="btn" type="button" id="copyC">Copy coordinates</button></div>`;
+  card.hidden = false;
+  document.getElementById('cardClose').onclick = closeCard;
+  document.getElementById('zoomTo').onclick = ()=>map.flyTo([s.lat,s.lon],14,{duration:1});
+  document.getElementById('copyC').onclick = e=>{
+    const b=e.currentTarget;
+    const done=()=>{b.textContent='Copied'; setTimeout(()=>b.textContent='Copy coordinates',1500)};
+    try{ navigator.clipboard.writeText(dec).then(done,()=>selectText()); }catch(_){ selectText(); }
+    function selectText(){ const r=document.createRange(); r.selectNodeContents(document.getElementById('dec')); const sel=getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent='Selected, press Ctrl+C'; }
+  };
+  if(fly) map.flyTo([s.lat,s.lon], Math.max(map.getZoom(),12), {duration:1});
+  renderList();
+}
+function closeCard(){
+  if(selected && markers[selected]) markers[selected].setIcon(makeIcon(SITES.find(s=>s.id===selected),false));
+  selected=null; card.hidden=true; renderList();
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !card.hidden) closeCard(); });
+
+// ---------- presentation ----------
+const listDistricts = arr => { const d=[...new Set(arr.map(s=>s.district))].sort(); return d.length>1 ? d.slice(0,-1).join(', ')+' and '+d.slice(-1) : d[0]; };
+const statLine = arr => ORDER.filter(t=>count(arr,t)).map(t=>`<span>${roundSVG(t,26)}${count(arr,t)}</span>`).join('');
+const st = SITES.filter(s=>s.type==='station');
+const nRadar = st.filter(s=>/OTT/.test(s.tech)).length, nTel = st.length - nRadar;
+const STEPS = [
+  {title:`${SITES.length} installations across ${DISTRICTS.length} districts`, text:'River gauges and automatic stations measure river levels. Community radios carry flood warnings to the communities around them.', area:'uganda', layers:ORDER, stats:SITES},
+  {title:`${count(SITES,'gauge')} community river gauges`, text:`Graduated staff gauges that show the river level at a glance, in ${listDistricts(SITES.filter(s=>s.type==='gauge'))}.`, area:'uganda', layers:['gauge']},
+  {title:`${st.length} automatic flood monitoring stations`, text:`${nRadar} OTT RLS 500 radar sensors and ${nTel} telemetric water level sensors that record river levels automatically, in ${listDistricts(st)}.`, area:'uganda', layers:['station']},
+  {title:`${count(SITES,'radio')} community radios`, text:`Broadcast points for flood warnings in ${listDistricts(SITES.filter(s=>s.type==='radio'))}.`, area:'uganda', layers:['radio']},
+  ...AREAS.filter(a=>a.id!=='uganda').map(a=>({title:`${a.name}${a.sub?': '+a.sub:''}`, text:`${a.sites.length} installation${a.sites.length>1?'s':''} in ${listDistricts(a.sites)}. Select any icon for its details.`, area:a.id, layers:ORDER, stats:a.sites})),
+  {title:'The full network', text:`${SITES.length} installations working together to detect floods early and warn communities in ${DISTRICTS.length} districts.`, area:'uganda', layers:ORDER, stats:SITES}
+];
+let step = -1;
+const tour = document.getElementById('tour');
+function showStep(i){
+  step = Math.max(0, Math.min(STEPS.length-1, i));
+  const S = STEPS[step];
+  ORDER.forEach(t=>setVisible(t, S.layers.includes(t)));
+  closeCard();
+  tour.hidden = false;
+  tour.innerHTML = `<div><div class="step">Step ${step+1} of ${STEPS.length}</div><h3>${esc(S.title)}</h3><p>${esc(S.text)}</p></div>
+    <div class="ctrls"><button class="btn" type="button" id="tPrev" ${step===0?'disabled':''} aria-label="Previous step">←</button>
+    <button class="btn primary" type="button" id="tNext">${step===STEPS.length-1?'Finish':'Next →'}</button>
+    <button class="btn" type="button" id="tExit" aria-label="Exit presentation">Exit</button></div>
+    ${S.stats?`<div class="stats">${statLine(S.stats)}</div>`:''}`;
+  document.getElementById('tPrev').onclick=()=>showStep(step-1);
+  document.getElementById('tNext').onclick=()=> step===STEPS.length-1 ? endTour() : showStep(step+1);
+  document.getElementById('tExit').onclick=endTour;
+  goArea(S.area);
+}
+function endTour(){ tour.hidden=true; step=-1; ORDER.forEach(t=>setVisible(t,true)); goArea('uganda'); }
+document.getElementById('presentBtn').onclick=()=>showStep(0);
+document.addEventListener('keydown',e=>{
+  if(tour.hidden || e.target.matches('input')) return;
+  if(e.key==='ArrowRight'||e.key===' '){ e.preventDefault(); step===STEPS.length-1?endTour():showStep(step+1); }
+  if(e.key==='ArrowLeft') showStep(step-1);
+  if(e.key==='Escape') endTour();
+});
+
+// ---------- start ----------
+renderList();
+map.fitBounds(ugaLayer.getBounds(),{padding:[20,20]});
+updateZoomClasses();
+document.querySelector('.chip[data-id="uganda"]').classList.add('on');
+new ResizeObserver(()=>map.invalidateSize()).observe(document.getElementById('map'));
+})();
+</script>
